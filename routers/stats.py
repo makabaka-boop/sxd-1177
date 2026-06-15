@@ -176,12 +176,10 @@ def repair_overview(
     ).count()
 
     completed_count = db.query(RepairOrder).filter(
-        RepairOrder.status == RepairStatus.completed
+        RepairOrder.status.in_([RepairStatus.completed, RepairStatus.closed])
     ).count()
 
-    total_count = pending_count + completed_count + db.query(RepairOrder).filter(
-        RepairOrder.status == RepairStatus.closed
-    ).count()
+    total_count = pending_count + completed_count
 
     repair_completion_rate = round(completed_count / total_count, 4) if total_count > 0 else 0.0
 

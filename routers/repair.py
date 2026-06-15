@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import (
     User, Umbrella, RepairOrder, RepairStatus, RepairSourceType, RepairResult,
-    UmbrellaZone, UmbrellaStatus,
+    UmbrellaZone, UmbrellaStatus, UserRole,
 )
 from schemas import (
     RepairOrderCreate, RepairOrderAssign, RepairOrderHandle,
@@ -44,6 +44,12 @@ def create_repair_order(
     umbrella = db.query(Umbrella).filter(Umbrella.id == req.umbrella_id).first()
     if not umbrella:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="雨伞不存在")
+    existing = db.query(RepairOrder).filter(
+        RepairOrder.umbrella_id == req.umbrella_id,
+        RepairOrder.status.in_([RepairStatus.pending, RepairStatus.assigned, RepairStatus.in_progress]),
+    ).first()
+    if existing:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该雨伞已有未处理的维修工单")
     now = datetime.now()
     order = RepairOrder(
         umbrella_id=req.umbrella_id,
@@ -69,6 +75,11 @@ def list_repair_orders(
     current_user: User = Depends(require_staff),
 ):
     q = db.query(RepairOrder)
+    if current_user.role != UserRole.admin:
+        q = q.filter(
+            (RepairOrder.creator_id == current_user.id) |
+            (RepairOrder.handler_id == current_user.id)
+        )
     if umbrella_id is not None:
         q = q.filter(RepairOrder.umbrella_id == umbrella_id)
     if status is not None:
@@ -109,6 +120,8 @@ def get_repair_order(
     order = db.query(RepairOrder).filter(RepairOrder.id == order_id).first()
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="维修工单不存在")
+    if current_user.role != UserRole.admin and order.creator_id != current_user.id and order.handler_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权查看该工单")
     return _enrich_repair_order(order)
 
 
@@ -129,6 +142,8 @@ def assign_repair_order(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="处理人不存在")
     if not handler.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="处理人已停用")
+    if handler.role != UserRole.staff:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="只能指派给现场员工")
     order.handler_id = req.handler_id
     order.status = RepairStatus.assigned
     db.commit()

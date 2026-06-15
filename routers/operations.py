@@ -230,7 +230,7 @@ def execute_inspection(
             anomaly_detail=it.anomaly_detail,
         )
         db.add(item)
-        if it.is_anomaly and it.anomaly_detail:
+        if it.is_anomaly:
             if umbrella.status not in (UmbrellaStatus.deactivated, UmbrellaStatus.pending_dry, UmbrellaStatus.pending_recheck):
                 umbrella.status = UmbrellaStatus.pending_dry
             existing_order = db.query(RepairOrder).filter(
@@ -238,10 +238,11 @@ def execute_inspection(
                 RepairOrder.status.in_([RepairStatus.pending, RepairStatus.assigned, RepairStatus.in_progress]),
             ).first()
             if not existing_order:
+                desc = it.anomaly_detail if it.anomaly_detail else "巡查发现异常"
                 repair_order = RepairOrder(
                     umbrella_id=umbrella.id,
                     source_type=RepairSourceType.inspection,
-                    anomaly_description=it.anomaly_detail,
+                    anomaly_description=desc,
                     status=RepairStatus.pending,
                     creator_id=current_user.id,
                     created_at=now,
