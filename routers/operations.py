@@ -6,6 +6,7 @@ from database import get_db
 from models import (
     User, Umbrella, UmbrellaOperation, UmbrellaStatus, WetnessLevel, RecheckResult,
     InspectionRule, InspectionRecord, InspectionItem,
+    RepairOrder, RepairSourceType, RepairStatus,
 )
 from schemas import (
     CheckoutRequest, ReturnRequest, DryStartRequest, RecheckRequest,
@@ -110,6 +111,21 @@ def recheck(req: RecheckRequest, db: Session = Depends(get_db), current_user: Us
         umbrella.status = UmbrellaStatus.available
     else:
         umbrella.status = UmbrellaStatus.pending_dry
+        existing_order = db.query(RepairOrder).filter(
+            RepairOrder.umbrella_id == umbrella.id,
+            RepairOrder.status.in_([RepairStatus.pending, RepairStatus.assigned, RepairStatus.in_progress]),
+        ).first()
+        if not existing_order:
+            now = datetime.now()
+            repair_order = RepairOrder(
+                umbrella_id=umbrella.id,
+                source_type=RepairSourceType.recheck_failed,
+                anomaly_description="雨伞晾干复查失败，需要维修处理",
+                status=RepairStatus.pending,
+                creator_id=current_user.id,
+                created_at=now,
+            )
+            db.add(repair_order)
     db.commit()
     db.refresh(op)
     return op
@@ -129,6 +145,21 @@ def deactivate(req: DeactivateRequest, db: Session = Depends(get_db), current_us
     ).order_by(UmbrellaOperation.id.desc()).first()
     if op:
         op.deactivate_reason = req.deactivate_reason
+    existing_order = db.query(RepairOrder).filter(
+        RepairOrder.umbrella_id == umbrella.id,
+        RepairOrder.status.in_([RepairStatus.pending, RepairStatus.assigned, RepairStatus.in_progress]),
+    ).first()
+    if not existing_order:
+        now = datetime.now()
+        repair_order = RepairOrder(
+            umbrella_id=umbrella.id,
+            source_type=RepairSourceType.staff_deactivate,
+            anomaly_description=req.deactivate_reason,
+            status=RepairStatus.pending,
+            creator_id=current_user.id,
+            created_at=now,
+        )
+        db.add(repair_order)
     db.commit()
     db.refresh(umbrella)
     return umbrella
@@ -202,6 +233,20 @@ def execute_inspection(
         if it.is_anomaly and it.anomaly_detail:
             if umbrella.status not in (UmbrellaStatus.deactivated, UmbrellaStatus.pending_dry, UmbrellaStatus.pending_recheck):
                 umbrella.status = UmbrellaStatus.pending_dry
+            existing_order = db.query(RepairOrder).filter(
+                RepairOrder.umbrella_id == umbrella.id,
+                RepairOrder.status.in_([RepairStatus.pending, RepairStatus.assigned, RepairStatus.in_progress]),
+            ).first()
+            if not existing_order:
+                repair_order = RepairOrder(
+                    umbrella_id=umbrella.id,
+                    source_type=RepairSourceType.inspection,
+                    anomaly_description=it.anomaly_detail,
+                    status=RepairStatus.pending,
+                    creator_id=current_user.id,
+                    created_at=now,
+                )
+                db.add(repair_order)
     db.commit()
     db.refresh(record)
     return record

@@ -6,13 +6,14 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import (
     User, Umbrella, UmbrellaOperation, UmbrellaZone,
-    UmbrellaStatus, WetnessLevel,
+    UmbrellaStatus, WetnessLevel, RepairOrder, RepairStatus,
 )
 from schemas import (
     UmbrellaOut, OperationOut,
     TurnoverItem, TurnoverRanking,
     PendingRecheckItem, PendingRecheckList,
     ZoneAnomalyItem, ZoneAnomalyStats,
+    RepairOverviewResponse, ZoneRepairStatsItem, RecentAnomalyUmbrellaItem,
 )
 from auth import require_staff
 
@@ -162,3 +163,64 @@ def zone_anomaly_stats(
             anomaly_rate=rate,
         ))
     return ZoneAnomalyStats(zones=items)
+
+
+@router.get("/repair-overview", response_model=RepairOverviewResponse)
+def repair_overview(
+    limit_recent: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_staff),
+):
+    pending_count = db.query(RepairOrder).filter(
+        RepairOrder.status.in_([RepairStatus.pending, RepairStatus.assigned, RepairStatus.in_progress])
+    ).count()
+
+    completed_count = db.query(RepairOrder).filter(
+        RepairOrder.status == RepairStatus.completed
+    ).count()
+
+    total_count = pending_count + completed_count + db.query(RepairOrder).filter(
+        RepairOrder.status == RepairStatus.closed
+    ).count()
+
+    repair_completion_rate = round(completed_count / total_count, 4) if total_count > 0 else 0.0
+
+    zones = db.query(UmbrellaZone).all()
+    zone_anomaly_stats = []
+    for z in zones:
+        anomaly_count = db.query(RepairOrder).join(
+            Umbrella, RepairOrder.umbrella_id == Umbrella.id
+        ).filter(
+            Umbrella.zone_id == z.id,
+            RepairOrder.status.in_([RepairStatus.pending, RepairStatus.assigned, RepairStatus.in_progress]),
+        ).count()
+        zone_anomaly_stats.append(ZoneRepairStatsItem(
+            zone_id=z.id,
+            zone_name=z.name,
+            anomaly_order_count=anomaly_count,
+        ))
+
+    recent_orders = db.query(RepairOrder).order_by(
+        RepairOrder.created_at.desc()
+    ).limit(limit_recent).all()
+
+    recent_anomaly_umbrellas = []
+    for order in recent_orders:
+        umbrella = order.umbrella
+        if umbrella:
+            recent_anomaly_umbrellas.append(RecentAnomalyUmbrellaItem(
+                umbrella_id=umbrella.id,
+                code=umbrella.code,
+                color=umbrella.color,
+                zone_id=umbrella.zone_id,
+                anomaly_description=order.anomaly_description,
+                created_at=order.created_at,
+            ))
+
+    return RepairOverviewResponse(
+        pending_count=pending_count,
+        completed_count=completed_count,
+        zone_anomaly_stats=zone_anomaly_stats,
+        repair_completion_rate=repair_completion_rate,
+        recent_anomaly_umbrellas=recent_anomaly_umbrellas,
+    )

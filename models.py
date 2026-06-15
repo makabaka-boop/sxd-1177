@@ -30,6 +30,26 @@ class RecheckResult(str, enum.Enum):
     failed = "failed"
 
 
+class RepairSourceType(str, enum.Enum):
+    inspection = "inspection"
+    staff_deactivate = "staff_deactivate"
+    recheck_failed = "recheck_failed"
+
+
+class RepairStatus(str, enum.Enum):
+    pending = "pending"
+    assigned = "assigned"
+    in_progress = "in_progress"
+    completed = "completed"
+    closed = "closed"
+
+
+class RepairResult(str, enum.Enum):
+    fixed = "fixed"
+    scrapped = "scrapped"
+    cannot_repair = "cannot_repair"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -150,3 +170,23 @@ class InspectionItem(Base):
 
     record = relationship("InspectionRecord", back_populates="items")
     umbrella = relationship("Umbrella")
+
+
+class RepairOrder(Base):
+    __tablename__ = "repair_orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    umbrella_id = Column(Integer, ForeignKey("umbrellas.id"), nullable=False, index=True)
+    source_type = Column(Enum(RepairSourceType), nullable=False)
+    anomaly_description = Column(Text, nullable=False)
+    status = Column(Enum(RepairStatus), nullable=False, default=RepairStatus.pending)
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    handler_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+    handle_remark = Column(Text, nullable=True)
+    repair_result = Column(Enum(RepairResult), nullable=True)
+
+    umbrella = relationship("Umbrella")
+    creator = relationship("User", foreign_keys=[creator_id])
+    handler = relationship("User", foreign_keys=[handler_id])

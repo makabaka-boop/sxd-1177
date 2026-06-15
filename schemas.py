@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel
-from models import UserRole, UmbrellaStatus, WetnessLevel, RecheckResult
+from models import UserRole, UmbrellaStatus, WetnessLevel, RecheckResult, RepairSourceType, RepairStatus, RepairResult
 
 
 class LoginRequest(BaseModel):
@@ -257,3 +257,65 @@ class InspectionRecordOut(BaseModel):
 class InspectionRuleWithLastInspect(InspectionRuleOut):
     last_inspected_at: Optional[datetime] = None
     is_due: bool = False
+
+
+class RepairOrderCreate(BaseModel):
+    umbrella_id: int
+    source_type: RepairSourceType
+    anomaly_description: str
+
+
+class RepairOrderAssign(BaseModel):
+    handler_id: int
+
+
+class RepairOrderHandle(BaseModel):
+    repair_result: RepairResult
+    handle_remark: Optional[str] = None
+
+
+class RepairOrderOut(BaseModel):
+    id: int
+    umbrella_id: int
+    umbrella_code: Optional[str] = None
+    source_type: RepairSourceType
+    anomaly_description: str
+    status: RepairStatus
+    creator_id: int
+    creator_username: Optional[str] = None
+    handler_id: Optional[int] = None
+    handler_username: Optional[str] = None
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    handle_remark: Optional[str] = None
+    repair_result: Optional[RepairResult] = None
+
+    model_config = {"from_attributes": True}
+
+
+class RepairOrderListResponse(BaseModel):
+    items: List[RepairOrderOut]
+    total: int
+
+
+class ZoneRepairStatsItem(BaseModel):
+    zone_id: int
+    zone_name: str
+    anomaly_order_count: int
+
+
+class RecentAnomalyUmbrellaItem(BaseModel):
+    umbrella_id: int
+    code: str
+    color: str
+    zone_id: Optional[int] = None
+    anomaly_description: str
+    created_at: datetime
+
+
+class RepairOverviewResponse(BaseModel):
+    pending_count: int
+    completed_count: int
+    zone_anomaly_stats: List[ZoneRepairStatsItem]
+    repair_completion_rate: float
+    recent_anomaly_umbrellas: List[RecentAnomalyUmbrellaItem]
