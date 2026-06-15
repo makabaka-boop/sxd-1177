@@ -20,19 +20,19 @@ def _enrich_transfer_order(order: TransferOrder) -> TransferOrderOut:
     return TransferOrderOut(
         id=order.id,
         umbrella_id=order.umbrella_id,
-        umbrella_code=order.umbrella.code if order.umbrella else None,
+        umbrella_code=order.umbrella_code,
         from_zone_id=order.from_zone_id,
-        from_zone_name=order.from_zone.name if order.from_zone else None,
+        from_zone_name=order.from_zone_name,
         to_zone_id=order.to_zone_id,
-        to_zone_name=order.to_zone.name if order.to_zone else None,
+        to_zone_name=order.to_zone_name,
         from_shift_id=order.from_shift_id,
-        from_shift_name=order.from_shift.name if order.from_shift else None,
+        from_shift_name=order.from_shift_name,
         to_shift_id=order.to_shift_id,
-        to_shift_name=order.to_shift.name if order.to_shift else None,
+        to_shift_name=order.to_shift_name,
         creator_id=order.creator_id,
-        creator_username=order.creator.username if order.creator else None,
+        creator_username=order.creator_username,
         receiver_id=order.receiver_id,
-        receiver_username=order.receiver.username if order.receiver else None,
+        receiver_username=order.receiver_username,
         reason=order.reason,
         status=order.status,
         created_at=order.created_at,
@@ -84,15 +84,25 @@ def create_transfer_order(
     if umbrella.zone_id == req.to_zone_id and umbrella.shift_id == req.to_shift_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="目标分区和班次与当前相同，无需调拨")
 
+    from_zone_name = umbrella.zone.name if umbrella.zone else None
+    from_shift_name = umbrella.shift.name if umbrella.shift else None
+
     now = datetime.now()
     order = TransferOrder(
         umbrella_id=req.umbrella_id,
+        umbrella_code=umbrella.code,
         from_zone_id=umbrella.zone_id,
+        from_zone_name=from_zone_name,
         to_zone_id=req.to_zone_id,
+        to_zone_name=to_zone.name,
         from_shift_id=umbrella.shift_id,
+        from_shift_name=from_shift_name,
         to_shift_id=req.to_shift_id,
+        to_shift_name=to_shift.name,
         creator_id=current_user.id,
+        creator_username=current_user.username,
         receiver_id=req.receiver_id,
+        receiver_username=receiver.username,
         reason=req.reason,
         status=TransferStatus.pending,
         created_at=now,
@@ -213,6 +223,17 @@ def receive_transfer_order(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="雨伞正在使用中，无法完成调拨")
     if umbrella.status == UmbrellaStatus.deactivated:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="雨伞已停用，无法完成调拨")
+
+    if umbrella.zone_id != order.from_zone_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="雨伞当前分区与调拨单原分区不一致，无法接收",
+        )
+    if umbrella.shift_id != order.from_shift_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="雨伞当前班次与调拨单原班次不一致，无法接收",
+        )
 
     now = datetime.now()
     umbrella.zone_id = order.to_zone_id

@@ -262,21 +262,19 @@ def transfer_overview(
 
     recent_transfers = []
     for order in recent_orders:
-        umbrella = order.umbrella
-        if umbrella:
-            recent_transfers.append(RecentTransferItem(
-                id=order.id,
-                umbrella_id=umbrella.id,
-                umbrella_code=umbrella.code,
-                from_zone_name=order.from_zone.name if order.from_zone else None,
-                to_zone_name=order.to_zone.name if order.to_zone else "",
-                from_shift_name=order.from_shift.name if order.from_shift else None,
-                to_shift_name=order.to_shift.name if order.to_shift else "",
-                creator_username=order.creator.username if order.creator else None,
-                receiver_username=order.receiver.username if order.receiver else None,
-                status=order.status,
-                created_at=order.created_at,
-            ))
+        recent_transfers.append(RecentTransferItem(
+            id=order.id,
+            umbrella_id=order.umbrella_id,
+            umbrella_code=order.umbrella_code,
+            from_zone_name=order.from_zone_name,
+            to_zone_name=order.to_zone_name,
+            from_shift_name=order.from_shift_name,
+            to_shift_name=order.to_shift_name,
+            creator_username=order.creator_username,
+            receiver_username=order.receiver_username,
+            status=order.status,
+            created_at=order.created_at,
+        ))
 
     return TransferOverviewResponse(
         total_transfer_count=total_count,
