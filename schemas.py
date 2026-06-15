@@ -1,7 +1,10 @@
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel
-from models import UserRole, UmbrellaStatus, WetnessLevel, RecheckResult, RepairSourceType, RepairStatus, RepairResult
+from models import (
+    UserRole, UmbrellaStatus, WetnessLevel, RecheckResult,
+    RepairSourceType, RepairStatus, RepairResult, TransferStatus,
+)
 
 
 class LoginRequest(BaseModel):
@@ -319,3 +322,68 @@ class RepairOverviewResponse(BaseModel):
     zone_anomaly_stats: List[ZoneRepairStatsItem]
     repair_completion_rate: float
     recent_anomaly_umbrellas: List[RecentAnomalyUmbrellaItem]
+
+
+class TransferOrderCreate(BaseModel):
+    umbrella_id: int
+    to_zone_id: int
+    to_shift_id: int
+    receiver_id: int
+    reason: Optional[str] = None
+
+
+class TransferOrderOut(BaseModel):
+    id: int
+    umbrella_id: int
+    umbrella_code: Optional[str] = None
+    from_zone_id: Optional[int] = None
+    from_zone_name: Optional[str] = None
+    to_zone_id: int
+    to_zone_name: Optional[str] = None
+    from_shift_id: Optional[int] = None
+    from_shift_name: Optional[str] = None
+    to_shift_id: int
+    to_shift_name: Optional[str] = None
+    creator_id: int
+    creator_username: Optional[str] = None
+    receiver_id: int
+    receiver_username: Optional[str] = None
+    reason: Optional[str] = None
+    status: TransferStatus
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class TransferOrderListResponse(BaseModel):
+    items: List[TransferOrderOut]
+    total: int
+
+
+class ZoneTransferStatsItem(BaseModel):
+    zone_id: int
+    zone_name: str
+    transfer_out_count: int
+    transfer_in_count: int
+
+
+class RecentTransferItem(BaseModel):
+    id: int
+    umbrella_id: int
+    umbrella_code: str
+    from_zone_name: Optional[str] = None
+    to_zone_name: str
+    from_shift_name: Optional[str] = None
+    to_shift_name: str
+    creator_username: Optional[str] = None
+    receiver_username: Optional[str] = None
+    status: TransferStatus
+    created_at: datetime
+
+
+class TransferOverviewResponse(BaseModel):
+    total_transfer_count: int
+    pending_receive_count: int
+    zone_transfer_stats: List[ZoneTransferStatsItem]
+    recent_transfers: List[RecentTransferItem]

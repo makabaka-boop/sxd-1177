@@ -50,6 +50,12 @@ class RepairResult(str, enum.Enum):
     cannot_repair = "cannot_repair"
 
 
+class TransferStatus(str, enum.Enum):
+    pending = "pending"
+    completed = "completed"
+    cancelled = "cancelled"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -190,3 +196,28 @@ class RepairOrder(Base):
     umbrella = relationship("Umbrella")
     creator = relationship("User", foreign_keys=[creator_id])
     handler = relationship("User", foreign_keys=[handler_id])
+
+
+class TransferOrder(Base):
+    __tablename__ = "transfer_orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    umbrella_id = Column(Integer, ForeignKey("umbrellas.id"), nullable=False, index=True)
+    from_zone_id = Column(Integer, ForeignKey("umbrella_zones.id"), nullable=True)
+    to_zone_id = Column(Integer, ForeignKey("umbrella_zones.id"), nullable=False)
+    from_shift_id = Column(Integer, ForeignKey("shifts.id"), nullable=True)
+    to_shift_id = Column(Integer, ForeignKey("shifts.id"), nullable=False)
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    receiver_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    reason = Column(Text, nullable=True)
+    status = Column(Enum(TransferStatus), nullable=False, default=TransferStatus.pending)
+    created_at = Column(DateTime, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+
+    umbrella = relationship("Umbrella")
+    from_zone = relationship("UmbrellaZone", foreign_keys=[from_zone_id])
+    to_zone = relationship("UmbrellaZone", foreign_keys=[to_zone_id])
+    from_shift = relationship("Shift", foreign_keys=[from_shift_id])
+    to_shift = relationship("Shift", foreign_keys=[to_shift_id])
+    creator = relationship("User", foreign_keys=[creator_id])
+    receiver = relationship("User", foreign_keys=[receiver_id])

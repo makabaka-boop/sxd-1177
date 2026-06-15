@@ -7,6 +7,7 @@ from database import get_db
 from models import (
     User, Umbrella, UmbrellaOperation, UmbrellaZone,
     UmbrellaStatus, WetnessLevel, RepairOrder, RepairStatus,
+    TransferOrder, TransferStatus,
 )
 from schemas import (
     UmbrellaOut, OperationOut,
@@ -14,6 +15,7 @@ from schemas import (
     PendingRecheckItem, PendingRecheckList,
     ZoneAnomalyItem, ZoneAnomalyStats,
     RepairOverviewResponse, ZoneRepairStatsItem, RecentAnomalyUmbrellaItem,
+    TransferOverviewResponse, ZoneTransferStatsItem, RecentTransferItem,
 )
 from auth import require_staff
 
@@ -221,4 +223,64 @@ def repair_overview(
         zone_anomaly_stats=zone_anomaly_stats,
         repair_completion_rate=repair_completion_rate,
         recent_anomaly_umbrellas=recent_anomaly_umbrellas,
+    )
+
+
+@router.get("/transfer-overview", response_model=TransferOverviewResponse)
+def transfer_overview(
+    limit_recent: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_staff),
+):
+    total_count = db.query(TransferOrder).count()
+
+    pending_count = db.query(TransferOrder).filter(
+        TransferOrder.status == TransferStatus.pending
+    ).count()
+
+    zones = db.query(UmbrellaZone).all()
+    zone_transfer_stats = []
+    for z in zones:
+        out_count = db.query(TransferOrder).filter(
+            TransferOrder.from_zone_id == z.id,
+            TransferOrder.status == TransferStatus.completed,
+        ).count()
+        in_count = db.query(TransferOrder).filter(
+            TransferOrder.to_zone_id == z.id,
+            TransferOrder.status == TransferStatus.completed,
+        ).count()
+        zone_transfer_stats.append(ZoneTransferStatsItem(
+            zone_id=z.id,
+            zone_name=z.name,
+            transfer_out_count=out_count,
+            transfer_in_count=in_count,
+        ))
+
+    recent_orders = db.query(TransferOrder).order_by(
+        TransferOrder.created_at.desc()
+    ).limit(limit_recent).all()
+
+    recent_transfers = []
+    for order in recent_orders:
+        umbrella = order.umbrella
+        if umbrella:
+            recent_transfers.append(RecentTransferItem(
+                id=order.id,
+                umbrella_id=umbrella.id,
+                umbrella_code=umbrella.code,
+                from_zone_name=order.from_zone.name if order.from_zone else None,
+                to_zone_name=order.to_zone.name if order.to_zone else "",
+                from_shift_name=order.from_shift.name if order.from_shift else None,
+                to_shift_name=order.to_shift.name if order.to_shift else "",
+                creator_username=order.creator.username if order.creator else None,
+                receiver_username=order.receiver.username if order.receiver else None,
+                status=order.status,
+                created_at=order.created_at,
+            ))
+
+    return TransferOverviewResponse(
+        total_transfer_count=total_count,
+        pending_receive_count=pending_count,
+        zone_transfer_stats=zone_transfer_stats,
+        recent_transfers=recent_transfers,
     )
