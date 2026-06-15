@@ -210,3 +210,50 @@ class ZoneAnomalyItem(BaseModel):
 
 class ZoneAnomalyStats(BaseModel):
     zones: List[ZoneAnomalyItem]
+
+
+class InspectionItemCreate(BaseModel):
+    umbrella_id: int
+    wetness_ok: Optional[bool] = None
+    handle_ok: Optional[bool] = None
+    status_ok: Optional[bool] = None
+    is_anomaly: bool = False
+    anomaly_detail: Optional[str] = None
+
+
+class InspectionItemOut(BaseModel):
+    id: int
+    record_id: int
+    umbrella_id: int
+    wetness_ok: Optional[bool] = None
+    handle_ok: Optional[bool] = None
+    status_ok: Optional[bool] = None
+    is_anomaly: bool
+    anomaly_detail: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class InspectionExecute(BaseModel):
+    rule_id: int
+    items: List[InspectionItemCreate]
+    notes: Optional[str] = None
+
+
+class InspectionRecordOut(BaseModel):
+    id: int
+    rule_id: int
+    zone_id: Optional[int] = None
+    inspector_id: int
+    inspected_at: datetime
+    total_checked: int
+    anomaly_count: int
+    notes: Optional[str] = None
+    items: List[InspectionItemOut] = []
+
+    model_config = {"from_attributes": True}
+
+
+class InspectionRuleWithLastInspect(InspectionRuleOut):
+    last_inspected_at: Optional[datetime] = None
+    is_due: bool = False

@@ -115,3 +115,38 @@ class InspectionRule(Base):
     description = Column(Text, nullable=True)
 
     zone = relationship("UmbrellaZone")
+    records = relationship("InspectionRecord", back_populates="rule")
+
+
+class InspectionRecord(Base):
+    __tablename__ = "inspection_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    rule_id = Column(Integer, ForeignKey("inspection_rules.id"), nullable=False)
+    zone_id = Column(Integer, ForeignKey("umbrella_zones.id"), nullable=True)
+    inspector_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    inspected_at = Column(DateTime, nullable=False)
+    total_checked = Column(Integer, default=0)
+    anomaly_count = Column(Integer, default=0)
+    notes = Column(Text, nullable=True)
+
+    rule = relationship("InspectionRule", back_populates="records")
+    zone = relationship("UmbrellaZone")
+    inspector = relationship("User")
+    items = relationship("InspectionItem", back_populates="record", cascade="all, delete-orphan")
+
+
+class InspectionItem(Base):
+    __tablename__ = "inspection_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    record_id = Column(Integer, ForeignKey("inspection_records.id"), nullable=False)
+    umbrella_id = Column(Integer, ForeignKey("umbrellas.id"), nullable=False)
+    wetness_ok = Column(Boolean, nullable=True)
+    handle_ok = Column(Boolean, nullable=True)
+    status_ok = Column(Boolean, nullable=True)
+    is_anomaly = Column(Boolean, default=False)
+    anomaly_detail = Column(Text, nullable=True)
+
+    record = relationship("InspectionRecord", back_populates="items")
+    umbrella = relationship("Umbrella")

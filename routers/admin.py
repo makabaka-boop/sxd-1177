@@ -168,8 +168,14 @@ def update_umbrella(umbrella_id: int, req: UmbrellaUpdate, db: Session = Depends
     if req.color is not None:
         umbrella.color = req.color
     if req.zone_id is not None:
+        zone = db.query(UmbrellaZone).filter(UmbrellaZone.id == req.zone_id).first()
+        if not zone:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="伞架分区不存在")
         umbrella.zone_id = req.zone_id
     if req.shift_id is not None:
+        shift = db.query(Shift).filter(Shift.id == req.shift_id).first()
+        if not shift:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="责任班次不存在")
         umbrella.shift_id = req.shift_id
     if req.estimated_dry_minutes is not None:
         umbrella.estimated_dry_minutes = req.estimated_dry_minutes
